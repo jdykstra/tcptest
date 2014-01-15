@@ -47,6 +47,11 @@
 #define INOUT
 
 #define TEST_REPEAT_COUNT 100
+#define THRESHOLD 4
+#define PRINT_ALL_STEPS 0
+
+
+#define MAX_NODENAME_LENGTH	100
 
 /* macros for handling errors.  If _pmi_abort_on_error is non-zero
    both of these macros lead to job abort */
@@ -66,12 +71,15 @@
 #define PMI_DEFAULT_LISTEN_QUEUE_SIZE 128
 
 
-static int listen_sock;
+static int listen_sock;		/* File descriptor we're listening on */
+char client_name[MAX_NODENAME_LENGTH];   /* Node names of client and server */
+char server_name[MAX_NODENAME_LENGTH];
+
 
 void
 log_tcp_info(int sfd, char *label)
 {
-    int tcp_info_len;
+    int tcp_info_len, threshold_exceeded;
     static char emsg[512];
     struct tcp_info tcp_info;
     time_t time2;
@@ -90,7 +98,10 @@ log_tcp_info(int sfd, char *label)
         return;
     }
 
-    fprintf(stdout, "fd %d %s tcpi_unacked %u retrans %u total_retrans %u snd_cwnd %u "
+    threshold_exceeded = tcp_info.tcpi_rto > THRESHOLD*1000000;
+
+    if (PRINT_ALL_STEPS || threshold_exceeded)
+    	fprintf(stdout, "fd %d %s tcpi_unacked %u retrans %u total_retrans %u snd_cwnd %u "
     		"last_data %u retransmits %u backoff %u snd_ssthres %u rto %u rtt %u rttvar %u rcv_rtt %u at %s\n",
                            sfd,
                            label,
@@ -109,8 +120,8 @@ log_tcp_info(int sfd, char *label)
                            asctime(localtime(&time2)));
 
     /* Break out of the test if we see what we're looking for.  */
-    if (tcp_info.tcpi_rto > 4*1000000){
-    	fprintf(stdout, "Excessive RTO of %u us. seen.\n", tcp_info.tcpi_rto);
+    if (threshold_exceeded){
+    	fprintf(stdout, "Excessive RTO of %u us. seen.  Client %s server %s\n", tcp_info.tcpi_rto, client_name, server_name);
     }
 }
 
@@ -742,7 +753,7 @@ int do_client_side(char *server_name)
 
 int main(int argc, char *argv[])
 {
-	char hostname[100];
+	char hostname[MAX_NODENAME_LENGTH];
 	int we_are_server;
 
 	if (argc != 2){
@@ -754,12 +765,16 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Error returned from gethostname.\n");
 
 	if (strcmp(argv[1], hostname) == 0){
-		fprintf(stdout, "We (%s) are the server.\n,", hostname);
+		strncpy(client_name, "(unknown)", MAX_NODENAME_LENGTH);
+		strncpy(server_name, hostname, MAX_NODENAME_LENGTH);
+		fprintf(stdout, "We (%s) are the server.\n,", server_name);
 		(void) do_server_side();
 	}
 	else {
-		fprintf(stdout, "We (%s) are the client.  %s is the server\n,", hostname, argv[1]);
-		(void)do_client_side(argv[1]);
+		strncpy(client_name, hostname, MAX_NODENAME_LENGTH);
+		strncpy(server_name, argv[1], MAX_NODENAME_LENGTH);
+		fprintf(stdout, "We (%s) are the client.  %s is the server\n,", client_name, server_name);
+		(void)do_client_side(server_name);
 	}
 
 	fprintf(stdout, "Successful completion of %d trials.\n", TEST_REPEAT_COUNT);
