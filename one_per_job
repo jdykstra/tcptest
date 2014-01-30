@@ -1,0 +1,13 @@
+#! /bin/bash
+
+NODEFILE=`mktemp nodelist.XXXXXXXXXXX`
+
+aprun -B -q /bin/hostname > $NODEFILE
+CLIENT=`head -n 1 $NODEFILE`
+SERVER=`tail -n 1 $NODEFILE`
+rm $NODEFILE
+
+echo "Server is $SERVER"
+echo "Client is $CLIENT"
+
+aprun -B ~/work/tcptest/tcptest $SERVER
