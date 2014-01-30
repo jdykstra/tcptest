@@ -580,13 +580,11 @@ inet_accept_with_address(int sock)
         ERROR_WARN("inet_setup_opts:fcntl(F_SETFL) failed %s\n",strerror(errno));
     }
 
-    fprintf(stderr, "_pmi_inet_setup: got an accept complete from %s\n",inet_ntoa(from.sin_addr));
     rc = inet_recv(s, nid, &data, sizeof (int));
     if (rc != 0) {
         ERROR_WARN("inet_accept: inet_recv returned error %s\n", strerror(errno));
         s = -1;
     }
-    fprintf(stderr, "_pmi_inet_setup: inet_recv for accept completion done\n");
 
     return s;
 }
